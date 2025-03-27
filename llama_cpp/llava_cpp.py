@@ -1,6 +1,6 @@
-import sys
+from __future__ import annotations
+
 import os
-import ctypes
 from ctypes import (
     c_bool,
     c_char_p,
@@ -13,68 +13,35 @@ from ctypes import (
     Structure,
 )
 import pathlib
-from typing import List, Union, NewType, Optional
+from typing import (
+    Union,
+    NewType,
+    Optional,
+    TYPE_CHECKING,
+)
 
 import llama_cpp.llama_cpp as llama_cpp
 
-# Load the library
-def _load_shared_library(lib_base_name: str):
-    # Construct the paths to the possible shared library names
-    _base_path = pathlib.Path(os.path.abspath(os.path.dirname(__file__)))
-    # Searching for the library in the current directory under the name "libllama" (default name
-    # for llamacpp) and "llama" (default name for this repo)
-    _lib_paths: List[pathlib.Path] = []
-    # Determine the file extension based on the platform
-    if sys.platform.startswith("linux"):
-        _lib_paths += [
-            _base_path / f"lib{lib_base_name}.so",
-        ]
-    elif sys.platform == "darwin":
-        _lib_paths += [
-            _base_path / f"lib{lib_base_name}.so",
-            _base_path / f"lib{lib_base_name}.dylib",
-        ]
-    elif sys.platform == "win32":
-        _lib_paths += [
-            _base_path / f"{lib_base_name}.dll",
-            _base_path / f"lib{lib_base_name}.dll",
-        ]
-    else:
-        raise RuntimeError("Unsupported platform")
+from llama_cpp._ctypes_extensions import (
+    load_shared_library,
+    ctypes_function_for_shared_library,
+)
 
-    if "LLAVA_CPP_LIB" in os.environ:
-        lib_base_name = os.environ["LLAVA_CPP_LIB"]
-        _lib = pathlib.Path(lib_base_name)
-        _base_path = _lib.parent.resolve()
-        _lib_paths = [_lib.resolve()]
-
-    cdll_args = dict()  # type: ignore
-    # Add the library directory to the DLL search path on Windows (if needed)
-    if sys.platform == "win32" and sys.version_info >= (3, 8):
-        os.add_dll_directory(str(_base_path))
-        if "CUDA_PATH" in os.environ:
-            os.add_dll_directory(os.path.join(os.environ["CUDA_PATH"], "bin"))
-            os.add_dll_directory(os.path.join(os.environ["CUDA_PATH"], "lib"))
-        cdll_args["winmode"] = ctypes.RTLD_GLOBAL
-
-    # Try to load the shared library, handling potential errors
-    for _lib_path in _lib_paths:
-        if _lib_path.exists():
-            try:
-                return ctypes.CDLL(str(_lib_path), **cdll_args) # type: ignore
-            except Exception as e:
-                raise RuntimeError(f"Failed to load shared library '{_lib_path}': {e}")
-
-    raise FileNotFoundError(
-        f"Shared library with base name '{lib_base_name}' not found"
+if TYPE_CHECKING:
+    from llama_cpp._ctypes_extensions import (
+        CtypesArray,
     )
 
 
 # Specify the base name of the shared library to load
 _libllava_base_name = "llava"
+_libllava_override_path = os.environ.get("LLAVA_CPP_LIB")
+_libllava_base_path = pathlib.Path(os.path.abspath(os.path.dirname(__file__))) / "lib" if _libllava_override_path is None else pathlib.Path()
 
 # Load the library
-_libllava = _load_shared_library(_libllava_base_name)
+_libllava = load_shared_library(_libllava_base_name, _libllava_base_path)
+
+ctypes_function = ctypes_function_for_shared_library(_libllava)
 
 
 ################################################
@@ -84,6 +51,7 @@ _libllava = _load_shared_library(_libllava_base_name)
 # struct clip_ctx;
 clip_ctx_p = NewType("clip_ctx_p", int)
 clip_ctx_p_ctypes = c_void_p
+
 
 # struct llava_image_embed {
 #     float * embed;
@@ -95,50 +63,77 @@ class llava_image_embed(Structure):
         ("n_image_pos", c_int),
     ]
 
+
 # /** sanity check for clip <-> llava embed size match */
 # LLAVA_API bool llava_validate_embed_size(const llama_context * ctx_llama, const clip_ctx * ctx_clip);
-def llava_validate_embed_size(ctx_llama: llama_cpp.llama_context_p, ctx_clip: clip_ctx_p, /) -> bool:
+@ctypes_function(
+    "llava_validate_embed_size",
+    [llama_cpp.llama_context_p_ctypes, clip_ctx_p_ctypes],
+    c_bool,
+)
+def llava_validate_embed_size(
+    ctx_llama: llama_cpp.llama_context_p, ctx_clip: clip_ctx_p, /
+) -> bool:
     ...
 
-llava_validate_embed_size = _libllava.llava_validate_embed_size
-llava_validate_embed_size.argtypes = [llama_cpp.llama_context_p_ctypes, clip_ctx_p_ctypes]
-llava_validate_embed_size.restype = c_bool
 
 # /** build an image embed from image file bytes */
 # LLAVA_API struct llava_image_embed * llava_image_embed_make_with_bytes(struct clip_ctx * ctx_clip, int n_threads, const unsigned char * image_bytes, int image_bytes_length);
-def llava_image_embed_make_with_bytes(ctx_clip: clip_ctx_p, n_threads: Union[c_int, int], image_bytes: bytes, image_bytes_length: Union[c_int, int], /) -> "_Pointer[llava_image_embed]":
+@ctypes_function(
+    "llava_image_embed_make_with_bytes",
+    [clip_ctx_p_ctypes, c_int, POINTER(c_uint8), c_int],
+    POINTER(llava_image_embed),
+)
+def llava_image_embed_make_with_bytes(
+    ctx_clip: clip_ctx_p,
+    n_threads: Union[c_int, int],
+    image_bytes: CtypesArray[c_uint8],
+    image_bytes_length: Union[c_int, int],
+    /,
+) -> "_Pointer[llava_image_embed]":
     ...
 
-llava_image_embed_make_with_bytes = _libllava.llava_image_embed_make_with_bytes
-llava_image_embed_make_with_bytes.argtypes = [clip_ctx_p_ctypes, c_int, POINTER(c_uint8), c_int]
-llava_image_embed_make_with_bytes.restype = POINTER(llava_image_embed)
 
 # /** build an image embed from a path to an image filename */
 # LLAVA_API struct llava_image_embed * llava_image_embed_make_with_filename(struct clip_ctx * ctx_clip, int n_threads, const char * image_path);
-def llava_image_embed_make_with_filename(ctx_clip: clip_ctx_p, n_threads: Union[c_int, int], image_path: bytes, /) -> "_Pointer[llava_image_embed]":
+@ctypes_function(
+    "llava_image_embed_make_with_filename",
+    [clip_ctx_p_ctypes, c_int, c_char_p],
+    POINTER(llava_image_embed),
+)
+def llava_image_embed_make_with_filename(
+    ctx_clip: clip_ctx_p, n_threads: Union[c_int, int], image_path: bytes, /
+) -> "_Pointer[llava_image_embed]":
     ...
 
-llava_image_embed_make_with_filename = _libllava.llava_image_embed_make_with_filename
-llava_image_embed_make_with_filename.argtypes = [clip_ctx_p_ctypes, c_int, c_char_p]
-llava_image_embed_make_with_filename.restype = POINTER(llava_image_embed)
 
 # LLAVA_API void llava_image_embed_free(struct llava_image_embed * embed);
 # /** free an embedding made with llava_image_embed_make_* */
+@ctypes_function("llava_image_embed_free", [POINTER(llava_image_embed)], None)
 def llava_image_embed_free(embed: "_Pointer[llava_image_embed]", /):
     ...
 
-llava_image_embed_free = _libllava.llava_image_embed_free
-llava_image_embed_free.argtypes = [POINTER(llava_image_embed)]
-llava_image_embed_free.restype = None
 
 # /** write the image represented by embed into the llama context with batch size n_batch, starting at context pos n_past. on completion, n_past points to the next position in the context after the image embed. */
 # LLAVA_API bool llava_eval_image_embed(struct llama_context * ctx_llama, const struct llava_image_embed * embed, int n_batch, int * n_past);
-def llava_eval_image_embed(ctx_llama: llama_cpp.llama_context_p, embed: "_Pointer[llava_image_embed]", n_batch: Union[c_int, int], n_past: "_Pointer[c_int]", /) -> bool:
+@ctypes_function(
+    "llava_eval_image_embed",
+    [
+        llama_cpp.llama_context_p_ctypes,
+        POINTER(llava_image_embed),
+        c_int,
+        POINTER(c_int),
+    ],
+    c_bool,
+)
+def llava_eval_image_embed(
+    ctx_llama: llama_cpp.llama_context_p,
+    embed: "_Pointer[llava_image_embed]",
+    n_batch: Union[c_int, int],
+    n_past: "_Pointer[c_int]",
+    /,
+) -> bool:
     ...
-
-llava_eval_image_embed = _libllava.llava_eval_image_embed
-llava_eval_image_embed.argtypes = [llama_cpp.llama_context_p_ctypes, POINTER(llava_image_embed), c_int, POINTER(c_int)]
-llava_eval_image_embed.restype = c_bool
 
 
 ################################################
@@ -148,18 +143,16 @@ llava_eval_image_embed.restype = c_bool
 
 # /** load mmproj model */
 # CLIP_API struct clip_ctx * clip_model_load    (const char * fname, int verbosity);
-def clip_model_load(fname: bytes, verbosity: Union[c_int, int], /) -> Optional[clip_ctx_p]:
+@ctypes_function("clip_model_load", [c_char_p, c_int], clip_ctx_p_ctypes)
+def clip_model_load(
+    fname: bytes, verbosity: Union[c_int, int], /
+) -> Optional[clip_ctx_p]:
     ...
 
-clip_model_load = _libllava.clip_model_load
-clip_model_load.argtypes = [c_char_p, c_int]
-clip_model_load.restype = clip_ctx_p_ctypes
 
 # /** free mmproj model */
 # CLIP_API void clip_free(struct clip_ctx * ctx);
+@ctypes_function("clip_free", [clip_ctx_p_ctypes], None)
 def clip_free(ctx: clip_ctx_p, /):
     ...
 
-clip_free = _libllava.clip_free
-clip_free.argtypes = [clip_ctx_p_ctypes]
-clip_free.restype = None

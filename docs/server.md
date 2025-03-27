@@ -76,12 +76,14 @@ Function calling is completely compatible with the OpenAI function calling API a
 
 You'll first need to download one of the available function calling models in GGUF format:
 
-- [functionary-7b-v1](https://huggingface.co/abetlen/functionary-7b-v1-GGUF)
+- [functionary](https://huggingface.co/meetkai)
 
-Then when you run the server you'll need to also specify the `functionary` chat_format
+Then when you run the server you'll need to also specify either `functionary-v1` or `functionary-v2` chat_format.
+
+Note that since functionary requires a HF Tokenizer due to discrepancies between llama.cpp and HuggingFace's tokenizers as mentioned [here](https://github.com/abetlen/llama-cpp-python/blob/main?tab=readme-ov-file#function-calling), you will need to pass in the path to the tokenizer too. The tokenizer files are already included in the respective HF repositories hosting the gguf files.
 
 ```bash
-python3 -m llama_cpp.server --model <model_path> --chat_format functionary
+python3 -m llama_cpp.server --model <model_path_to_functionary_v2_model> --chat_format functionary-v2 --hf_pretrained_model_name_or_path <model_path_to_functionary_v2_tokenizer>
 ```
 
 Check out this [example notebook](https://github.com/abetlen/llama-cpp-python/blob/main/examples/notebooks/Functions.ipynb) for a walkthrough of some interesting use cases for function calling.
@@ -96,6 +98,8 @@ You'll first need to download one of the available multi-modal models in GGUF fo
 - [llava-v1.5-7b](https://huggingface.co/mys/ggml_llava-v1.5-7b)
 - [llava-v1.5-13b](https://huggingface.co/mys/ggml_llava-v1.5-13b)
 - [bakllava-1-7b](https://huggingface.co/mys/ggml_bakllava-1)
+- [llava-v1.6-34b](https://huggingface.co/cjpais/llava-v1.6-34B-gguf)
+- [moondream2](https://huggingface.co/vikhyatk/moondream2)
 
 Then when you run the server you'll need to also specify the path to the clip model used for image embedding and the `llava-1-5` chat_format
 

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import multiprocessing
 
-from typing import Optional, List, Literal, Union
-from pydantic import Field
+from typing import Optional, List, Literal, Union, Dict, cast
+from typing_extensions import Self
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
 
 import llama_cpp
@@ -29,7 +31,7 @@ class ModelSettings(BaseSettings):
         description="The number of layers to put on the GPU. The rest will be on the CPU. Set -1 to move all to GPU.",
     )
     split_mode: int = Field(
-        default=llama_cpp.LLAMA_SPLIT_LAYER,
+        default=llama_cpp.LLAMA_SPLIT_MODE_LAYER,
         description="The split mode to use.",
     )
     main_gpu: int = Field(
@@ -45,16 +47,20 @@ class ModelSettings(BaseSettings):
         default=False, description="Whether to only return the vocabulary."
     )
     use_mmap: bool = Field(
-        default=llama_cpp.llama_mmap_supported(),
+        default=llama_cpp.llama_supports_mmap(),
         description="Use mmap.",
     )
     use_mlock: bool = Field(
-        default=llama_cpp.llama_mlock_supported(),
+        default=llama_cpp.llama_supports_mlock(),
         description="Use mlock.",
     )
     kv_overrides: Optional[List[str]] = Field(
         default=None,
         description="List of model kv overrides in the format key=type:value where type is one of (bool, int, float). Valid true values are (true, TRUE, 1), otherwise false.",
+    )
+    rpc_servers: Optional[str] = Field(
+        default=None,
+        description="comma seperated list of rpc servers for offloading",
     )
     # Context Params
     seed: int = Field(
@@ -64,17 +70,22 @@ class ModelSettings(BaseSettings):
     n_batch: int = Field(
         default=512, ge=1, description="The batch size to use per eval."
     )
+    n_ubatch: int = Field(
+        default=512, ge=1, description="The physical batch size used by llama.cpp"
+    )
     n_threads: int = Field(
         default=max(multiprocessing.cpu_count() // 2, 1),
         ge=1,
-        description="The number of threads to use.",
+        description="The number of threads to use. Use -1 for max cpu threads",
     )
     n_threads_batch: int = Field(
-        default=max(multiprocessing.cpu_count() // 2, 1),
+        default=max(multiprocessing.cpu_count(), 1),
         ge=0,
-        description="The number of threads to use when batch processing.",
+        description="The number of threads to use when batch processing. Use -1 for max cpu threads",
     )
-    rope_scaling_type: int = Field(default=llama_cpp.LLAMA_ROPE_SCALING_UNSPECIFIED)
+    rope_scaling_type: int = Field(
+        default=llama_cpp.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED
+    )
     rope_freq_base: float = Field(default=0.0, description="RoPE base frequency")
     rope_freq_scale: float = Field(
         default=0.0, description="RoPE frequency scaling factor"
@@ -88,9 +99,12 @@ class ModelSettings(BaseSettings):
         default=True, description="if true, use experimental mul_mat_q kernels"
     )
     logits_all: bool = Field(default=True, description="Whether to return logits.")
-    embedding: bool = Field(default=True, description="Whether to use embeddings.")
+    embedding: bool = Field(default=False, description="Whether to use embeddings.")
     offload_kqv: bool = Field(
         default=True, description="Whether to offload kqv to the GPU."
+    )
+    flash_attn: bool = Field(
+        default=False, description="Whether to use flash attention."
     )
     # Sampling Params
     last_n_tokens_size: int = Field(
@@ -143,6 +157,11 @@ class ModelSettings(BaseSettings):
         default=None,
         description="The model name or path to a pretrained HuggingFace tokenizer model. Same as you would pass to AutoTokenizer.from_pretrained().",
     )
+    # Loading from HuggingFace Model Hub
+    hf_model_repo_id: Optional[str] = Field(
+        default=None,
+        description="The model repo id to use for the HuggingFace tokenizer model.",
+    )
     # Speculative Decoding
     draft_model: Optional[str] = Field(
         default=None,
@@ -152,10 +171,32 @@ class ModelSettings(BaseSettings):
         default=10,
         description="Number of tokens to predict using the draft model.",
     )
+    # KV Cache Quantization
+    type_k: Optional[int] = Field(
+        default=None,
+        description="Type of the key cache quantization.",
+    )
+    type_v: Optional[int] = Field(
+        default=None,
+        description="Type of the value cache quantization.",
+    )
     # Misc
     verbose: bool = Field(
         default=True, description="Whether to print debug information."
     )
+
+    @model_validator(
+        mode="before"
+    )  # pre=True to ensure this runs before any other validation
+    def set_dynamic_defaults(self) -> Self:
+        # If n_threads or n_threads_batch is -1, set it to multiprocessing.cpu_count()
+        cpu_count = multiprocessing.cpu_count()
+        values = cast(Dict[str, int], self)
+        if values.get("n_threads", 0) == -1:
+            values["n_threads"] = cpu_count
+        if values.get("n_threads_batch", 0) == -1:
+            values["n_threads_batch"] = cpu_count
+        return self
 
 
 class ServerSettings(BaseSettings):
@@ -179,6 +220,14 @@ class ServerSettings(BaseSettings):
         default=True,
         description="Whether to interrupt requests when a new request is received.",
     )
+    disable_ping_events: bool = Field(
+        default=False,
+        description="Disable EventSource pings (may be needed for some clients).",
+    )
+    root_path: str = Field(
+        default="",
+        description="The root path for the server. Useful when running behind a reverse proxy.",
+    )
 
 
 class Settings(ServerSettings, ModelSettings):
@@ -188,6 +237,4 @@ class Settings(ServerSettings, ModelSettings):
 class ConfigFileSettings(ServerSettings):
     """Configuration file format settings."""
 
-    models: List[ModelSettings] = Field(
-        default=[], description="Model configs"
-    )
+    models: List[ModelSettings] = Field(default=[], description="Model configs")
