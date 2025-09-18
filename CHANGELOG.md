@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.16]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@4227c9be4268ac844921b90f31595f81236bd317
+
+## [0.3.15]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@9a96389544a08fd829fccda28142ce2066017fde
+- feat: Add gpt-oss chat format support through strftime_now in chat format by @iamlemec in af637928db7351e030011085f818b034c6efc047
+- fix: rename op_offloat to op_offload in llama.py by @sergey21000 in #2046
+
+## [0.3.14]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@79e0b68c178656bb0632cb8602d2940b755077f8
+
+## [0.3.13]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@bdca38376f7e8dd928defe01ce6a16218a64b040
+- fix: Better chat format for Qwen2.5-VL by @alcoftTAO in #2040
+
+## [0.3.12]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@a0374a67e2924f2e845cdc59dd67d9a44065a89c
+
+## [0.3.11]
+
+- fix: Update reference to `llama_kv_cache_clear` in Llama.embed. Closes #2037 by @abetlen in 9e5a4eaa84156084ed7bbb91e6efcc91dc6217bc
+
+## [0.3.10]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@8846aace4934ad29651ea61b8c7e3f6b0556e3d2
+- feat: Add support for llama.cpp multimodal, add Qwen2.5-VL chat handler by @abetlen in cd548bd0f14210627798237d5c2ea78acfb88ccb
+
+## [0.3.9]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@8733e0cf6eefc7c7752297cc22d0836706f4222c
+
+## [0.3.8]
+
+- feat: Update llama.cpp to ggerganov/llama.cpp@7841fc723e059d1fd9640e5c0ef19050fcc7c698
+
 ## [0.3.7]
 
 - feat: Update llama.cpp to ggerganov/llama.cpp@794fe23f29fb40104975c91fe19f23798f7c726e
