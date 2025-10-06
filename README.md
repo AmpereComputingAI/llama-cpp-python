@@ -1,7 +1,6 @@
 #  Python Bindings for [`Ampere® optimized llama.cpp`](https://github.com/AmpereComputingAI/llama.cpp)
 
-Simple Python bindings for **@ggerganov's** [`Ampere® optimized llama.cpp`](https://github.com/AmpereComputingAI/llama.cpp)
-[`llama.cpp`] based on **@ggerganov's** (https://github.com/ggerganov/llama.cpp) library and **abetlen's** (https://github.com/abetlen/llama-cpp-python) bindings
+Simple Python bindings for [`Ampere® optimized llama.cpp`](https://github.com/AmpereComputingAI/llama.cpp) based on **@ggerganov's** [llama.cpp](https://github.com/ggerganov/llama.cpp) library and **@abetlen's** [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) bindings
 This package maintains compatibility with the original project.
 
 **For best results we recommend using models in our custom quantization formats available here: [AmpereComputing HF](https://huggingface.co/AmpereComputing)**
