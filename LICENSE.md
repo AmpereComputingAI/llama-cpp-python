@@ -250,10 +250,11 @@ unenforceable such term or provision in any other jurisdiction.
 
 ## Exhibit A – Software
 Ampere AI Software
-• Ampere Inference Optimizer (AIO) Library – AI Acceleration Engine
-• AIO Examples – Jupyter Notebook, small datasets, model download and command Line scripts to run the AIO demos
-• Tensorflow – Python packages, libraries and binaries of Tensorflow framework
-• Pytorch – Python package, libraries and binaries of Pytorch framework
+- Ampere Inference Optimizer (AIO) Library – AI Acceleration Engine
+- AIO Examples – Jupyter Notebook, small datasets, model download and command Line scripts to run the AIO demos
+- Tensorflow – Python packages, libraries and binaries of Tensorflow framework
+- Pytorch – Python package, libraries and binaries of Pytorch framework
+- Llama-cpp-python-ampere - Python package, libraries and binaries of the llama-cpp-python-ampere
 
 ## Notice
 Based on llama.cpp and llama-cpp-python from upstream.

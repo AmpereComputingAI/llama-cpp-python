@@ -803,4 +803,4 @@ Any contributions and changes to this package will be made with these goals in m
 
 ## License
 
-This project is licensed under the terms of the MIT license.
+This project is licensed under the terms of the Ampere AI Software End User License Agreement.
