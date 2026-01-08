@@ -1,7 +1,11 @@
 name: Build Release for Ampere
 
 #TODO: add lib to build
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ampere-build-3.2.1
 
 permissions:
   contents: write
