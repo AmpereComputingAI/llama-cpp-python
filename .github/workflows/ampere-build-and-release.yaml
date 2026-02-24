@@ -12,17 +12,19 @@ permissions:
 
 jobs:
   build_wheels_arm64:
-    name: Build arm64 wheels
+    name: Build arm64 wheel (Python ${{ matrix.python-version }})
     runs-on: [self-hosted]
     container:
-      image: ubuntu:22.04
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock
+      image: ubuntu:24.04
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - name: Install prerequisites
+      - name: Install system dependencies
         run: |
           apt-get update
-          apt-get install -y git python3 python3-pip docker.io
+          apt-get install -y git cmake ninja-build gcc g++ curl
 
       - uses: actions/checkout@v4
         with:
@@ -31,24 +33,17 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel==2.22.0
+      - name: Install build dependencies
+        run: python -m pip install build scikit-build-core
 
-      - name: Build wheels
-        run: python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_SKIP: "*musllinux* pp*"
-          CIBW_REPAIR_WHEEL_COMMAND: ""
-          CIBW_ARCHS: "aarch64"
-          CIBW_ENVIRONMENT: 'CMAKE_ARGS="-DGGML_NATIVE=ON"'
-          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
+      - name: Build wheel
+        run: CMAKE_ARGS="-DGGML_NATIVE=ON" python -m build --wheel --outdir wheelhouse/
 
-      - name: Upload wheels as artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: wheels_arm64
+          name: wheel-py${{ matrix.python-version }}
           path: ./wheelhouse/*.whl
 
   release:
@@ -56,11 +51,12 @@ jobs:
     needs: [build_wheels_arm64]
     runs-on: [self-hosted]
     container:
-      image: ubuntu:22.04
+      image: ubuntu:24.04
 
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: wheel-py*
           merge-multiple: true
           path: dist
 
