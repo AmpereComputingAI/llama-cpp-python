@@ -39,7 +39,11 @@ jobs:
         run: python -m pip install build scikit-build-core
 
       - name: Build wheel
-        run: CMAKE_ARGS="-DGGML_NATIVE=ON" python -m build --wheel --outdir wheelhouse/
+        run: >
+          CMAKE_ARGS="-DGGML_NATIVE=OFF
+          -DCMAKE_CXX_FLAGS='-march=armv8.2-a+dotprod+fp16'
+          -DCMAKE_C_FLAGS='-march=armv8.2-a+dotprod+fp16'"
+          python -m build --wheel --outdir wheelhouse/
 
       - name: Inspect wheel contents
         run: |
