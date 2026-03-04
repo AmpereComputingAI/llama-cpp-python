@@ -12,19 +12,17 @@ permissions:
 
 jobs:
   build_wheels_arm64:
-    name: Build arm64 wheel (Python ${{ matrix.python-version }})
+    name: Build arm64 wheels
     runs-on: [self-hosted]
     container:
-      image: ubuntu:24.04
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+      image: ubuntu:22.04
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock
 
     steps:
-      - name: Install system dependencies
+      - name: Install prerequisites
         run: |
           apt-get update
-          apt-get install -y git cmake ninja-build gcc g++ curl
+          apt-get install -y git python3 python3-pip docker.io
 
       - uses: actions/checkout@v4
         with:
@@ -33,17 +31,26 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
 
-      - name: Install build dependencies
-        run: python -m pip install build scikit-build-core
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.22.0
 
-      - name: Build wheel
-        run: >
-          CMAKE_ARGS="-DGGML_NATIVE=OFF
-          -DCMAKE_CXX_FLAGS='-march=armv8.2-a+dotprod+fp16'
-          -DCMAKE_C_FLAGS='-march=armv8.2-a+dotprod+fp16'"
-          python -m build --wheel --outdir wheelhouse/
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_SKIP: "*musllinux* pp*"
+          CIBW_REPAIR_WHEEL_COMMAND: ""
+          CIBW_ARCHS: "aarch64"
+          CIBW_MANYLINUX_AARCH64_IMAGE: "quay.io/pypa/manylinux_2_34_aarch64"
+          CIBW_BEFORE_ALL: "dnf install -y gcc-toolset-13"
+          CIBW_ENVIRONMENT: >
+            CC=/opt/rh/gcc-toolset-13/root/usr/bin/gcc
+            CXX=/opt/rh/gcc-toolset-13/root/usr/bin/g++
+            CMAKE_ARGS="-DGGML_NATIVE=OFF
+            -DCMAKE_CXX_FLAGS=-march=armv8.2-a+dotprod+fp16
+            -DCMAKE_C_FLAGS=-march=armv8.2-a+dotprod+fp16"
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
 
       - name: Inspect wheel contents
         run: |
@@ -54,7 +61,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel-py${{ matrix.python-version }}
+          name: wheels_arm64
           path: ./wheelhouse/*.whl
 
   release:
@@ -63,13 +70,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: [self-hosted]
     container:
-      image: ubuntu:24.04
+      image: ubuntu:22.04
 
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: wheel-py*
-          merge-multiple: true
+          name: wheels_arm64
           path: dist
 
       - uses: softprops/action-gh-release@v2
@@ -77,3 +83,30 @@ jobs:
           files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish to PyPI
+    needs: [build_wheels_arm64]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: [self-hosted]
+    container:
+      image: ubuntu:22.04
+
+    steps:
+      - name: Install prerequisites
+        run: |
+          apt-get update
+          apt-get install -y python3 python3-pip
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels_arm64
+          path: dist/
+
+      - name: Publish to PyPI
+        run: |
+          python3 -m pip install twine
+          python3 -m twine upload --non-interactive dist/*.whl
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
