@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - ampere-build-3.2.1-devel
       - ampere-build-3.2.1
 
 permissions:
