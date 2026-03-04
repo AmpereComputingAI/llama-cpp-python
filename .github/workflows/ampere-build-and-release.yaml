@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - ampere-build-3.2.1
+    tags:
+      - "v*"
 
 permissions:
   contents: write
