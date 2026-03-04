@@ -64,6 +64,7 @@ all = [
 
 [tool.scikit-build]
 wheel.packages = ["llama_cpp"]
+wheel.exclude = ["bin/**", "include/**", "lib64/**", "share/**"]
 cmake.verbose = true
 cmake.minimum-version = "3.21"
 minimum-version = "0.5.1"
