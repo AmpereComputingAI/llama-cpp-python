@@ -28,20 +28,37 @@ jobs:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: recursive
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel==2.22.0
+        run: python -m pip install cibuildwheel==2.22.0
 
       - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse
+        run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_SKIP: "*musllinux* pp*"
           CIBW_REPAIR_WHEEL_COMMAND: ""
           CIBW_ARCHS: "aarch64"
-          CIBW_ENVIRONMENT: 'CMAKE_ARGS="-DGGML_NATIVE=ON"'
+          CIBW_MANYLINUX_AARCH64_IMAGE: "quay.io/pypa/manylinux_2_34_aarch64"
+          CIBW_BEFORE_ALL: "dnf install -y gcc-toolset-13"
+          CIBW_ENVIRONMENT: >
+            CC=/opt/rh/gcc-toolset-13/root/usr/bin/gcc
+            CXX=/opt/rh/gcc-toolset-13/root/usr/bin/g++
+            CMAKE_ARGS="-DGGML_NATIVE=OFF
+            -DCMAKE_CXX_FLAGS=-march=armv8.2-a+dotprod+fp16
+            -DCMAKE_C_FLAGS=-march=armv8.2-a+dotprod+fp16"
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
 
-      - name: Upload wheels as artifacts
-        uses: actions/upload-artifact@v4
+      - name: Inspect wheel contents
+        run: |
+          for whl in wheelhouse/*.whl; do
+            echo "=== $(basename $whl) ==="
+            python -m zipfile -l "$whl"
+          done
+
+      - uses: actions/upload-artifact@v4
         with:
           name: wheels_arm64
           path: ./wheelhouse/*.whl
@@ -49,6 +66,7 @@ jobs:
   release:
     name: Release
     needs: [build_wheels_arm64]
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: [self-hosted]
     container:
       image: ubuntu:22.04
@@ -56,7 +74,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          merge-multiple: true
+          name: wheels_arm64
           path: dist
 
       - uses: softprops/action-gh-release@v2
@@ -64,3 +82,30 @@ jobs:
           files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish to PyPI
+    needs: [build_wheels_arm64]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: [self-hosted]
+    container:
+      image: ubuntu:22.04
+
+    steps:
+      - name: Install prerequisites
+        run: |
+          apt-get update
+          apt-get install -y python3 python3-pip
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels_arm64
+          path: dist/
+
+      - name: Publish to PyPI
+        run: |
+          python3 -m pip install twine
+          python3 -m twine upload --non-interactive dist/*.whl
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
