@@ -53,7 +53,7 @@ jobs:
         run: |
           for whl in wheelhouse/*.whl; do
             echo "=== $(basename $whl) ==="
-            python -m zipfile -l "$whl"
+            python3 -m zipfile -l "$whl"
           done
 
       - uses: actions/upload-artifact@v4
